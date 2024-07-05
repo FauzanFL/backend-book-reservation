@@ -248,36 +248,37 @@ describe('Library Management API', () => {
       jest.spyOn(Penalty, 'findOne').mockRestore();
     });
 
-    // it('should return success response', async () => {
-    //   jest
-    //     .spyOn(Member, 'findOne')
-    //     .mockReturnValueOnce(
-    //       Promise.resolve({ id: 1, code: 'M001', borrowing: 1 })
-    //     );
-    //   jest
-    //     .spyOn(BorrowedBook, 'findOne')
-    //     .mockReturnValueOnce(Promise.resolve(null));
-    //   jest.spyOn(Penalty, 'findOne').mockReturnValueOnce(Promise.resolve(null));
-    //   jest
-    //     .spyOn(Book, 'findOne')
-    //     .mockReturnValueOnce(
-    //       Promise.resolve({ id: 2, code: 'JK-45', stock: 1 })
-    //     );
-    //   const response = await agent.post('/books/borrow').send({
-    //     member_code: 'M001',
-    //     book_code: 'JK-45',
-    //   });
-    //   // expect(response.statusCode).toBe(200);
-    //   expect(response.body).toHaveProperty('message');
-    //   expect(response.body.message).toEqual('Book borrowed successfully');
-
-    //   jest.spyOn(Member, 'findOne').mockRestore();
-    //   jest.spyOn(BorrowedBook, 'findOne').mockRestore();
-    //   jest.spyOn(Penalty, 'findOne').mockRestore();
-    //   jest.spyOn(Book, 'findOne').mockRestore();
-    // });
-
     it('should return success response', async () => {
+      jest.spyOn(Member, 'findOne').mockReturnValueOnce(
+        Promise.resolve({
+          id: 1,
+          code: 'M001',
+          borrowing: 0,
+          update: jest.fn().mockResolvedValueOnce({ id: 2, borrowing: 1 }),
+        })
+      );
+      jest
+        .spyOn(BorrowedBook, 'findOne')
+        .mockReturnValueOnce(Promise.resolve(null));
+      jest.spyOn(Penalty, 'findOne').mockReturnValueOnce(Promise.resolve(null));
+      jest.spyOn(Book, 'findOne').mockReturnValueOnce(
+        Promise.resolve({
+          id: 2,
+          code: 'JK-45',
+          stock: 1,
+          update: jest.fn().mockResolvedValueOnce({ id: 2, stock: 0 }),
+        })
+      );
+      jest
+        .spyOn(BorrowedBook, 'create')
+        .mockImplementationOnce(async (borrowedBookData) => {
+          console.log(
+            'Mocked BorrowedBook.create called with:',
+            borrowedBookData
+          );
+          return { id: 1, ...borrowedBookData };
+        });
+
       const response = await agent.post('/books/borrow').send({
         member_code: 'M001',
         book_code: 'JK-45',
@@ -285,6 +286,12 @@ describe('Library Management API', () => {
       expect(response.statusCode).toBe(200);
       expect(response.body).toHaveProperty('message');
       expect(response.body.message).toEqual('Book borrowed successfully');
+
+      jest.spyOn(Member, 'findOne').mockRestore();
+      jest.spyOn(BorrowedBook, 'findOne').mockRestore();
+      jest.spyOn(BorrowedBook, 'create').mockRestore();
+      jest.spyOn(Penalty, 'findOne').mockRestore();
+      jest.spyOn(Book, 'findOne').mockRestore();
     });
   });
 
@@ -342,6 +349,28 @@ describe('Library Management API', () => {
     });
 
     it('should return book returned successfully', async () => {
+      jest.spyOn(Member, 'findOne').mockReturnValueOnce(
+        Promise.resolve({
+          id: 1,
+          code: 'M001',
+          borrowing: 1,
+          update: jest.fn().mockResolvedValueOnce({ id: 1, borrowing: 0 }),
+        })
+      );
+      jest.spyOn(Book, 'findOne').mockReturnValueOnce(
+        Promise.resolve({
+          id: 2,
+          code: 'JK-45',
+          stock: 0,
+          update: jest.fn().mockResolvedValueOnce({ id: 2, stock: 1 }),
+        })
+      );
+      jest
+        .spyOn(BorrowedBook, 'findOne')
+        .mockReturnValueOnce(
+          Promise.resolve({ id: 3, book_id: 2, member_id: 1 })
+        );
+
       const response = await agent.post('/books/return').send({
         member_code: 'M001',
         book_code: 'JK-45',
@@ -349,71 +378,51 @@ describe('Library Management API', () => {
       expect(response.statusCode).toBe(200);
       expect(response.body).toHaveProperty('message');
       expect(response.body.message).toEqual('Book returned successfully');
+
+      jest.spyOn(Member, 'findOne').mockRestore();
+      jest.spyOn(Book, 'findOne').mockRestore();
+      jest.spyOn(BorrowedBook, 'findOne').mockRestore();
     });
 
-    //   it('should return book returned successfully', async () => {
-    //     jest
-    //       .spyOn(Member, 'findOne')
-    //       .mockReturnValueOnce(
-    //         Promise.resolve({ id: 1, code: 'M001', borrowing: 1 })
-    //       );
-    //     jest
-    //       .spyOn(Book, 'findOne')
-    //       .mockReturnValueOnce(
-    //         Promise.resolve({ id: 2, code: 'JK-45', stock: 0 })
-    //       );
-    //     jest
-    //       .spyOn(BorrowedBook, 'findOne')
-    //       .mockReturnValueOnce(
-    //         Promise.resolve({ id: 3, book_id: 2, member_id: 1 })
-    //       );
+    it('should return book returned successfully with penalty (not on time)', async () => {
+      jest.spyOn(Member, 'findOne').mockReturnValueOnce(
+        Promise.resolve({
+          id: 1,
+          code: 'M001',
+          borrowing: 1,
+          update: jest.fn().mockResolvedValueOnce({ id: 1, borrowing: 0 }),
+        })
+      );
+      jest.spyOn(Book, 'findOne').mockReturnValueOnce(
+        Promise.resolve({
+          id: 2,
+          code: 'JK-45',
+          stock: 0,
+          update: jest.fn().mockResolvedValueOnce({ id: 2, stock: 1 }),
+        })
+      );
+      jest.spyOn(BorrowedBook, 'findOne').mockReturnValueOnce(
+        Promise.resolve({
+          id: 3,
+          book_id: 2,
+          member_id: 1,
+          date_returned: new Date(Date.now() - 1 * 60 * 1000),
+        })
+      );
 
-    //     const response = await agent.post('/books/return').send({
-    //       member_code: 'M001',
-    //       book_code: 'JK-45',
-    //     });
-    //     expect(response.statusCode).toBe(200);
-    //     expect(response.body).toHaveProperty('message');
-    //     expect(response.body.message).toEqual('Book returned successfully');
+      const response = await agent.post('/books/return').send({
+        member_code: 'M001',
+        book_code: 'JK-45',
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.message).toEqual(
+        'Book returned successfully with penalty'
+      );
 
-    //     jest.spyOn(Member, 'findOne').mockRestore();
-    //     jest.spyOn(Book, 'findOne').mockRestore();
-    //     jest.spyOn(BorrowedBook, 'findOne').mockRestore();
-    //   });
-
-    //   it('should return book returned successfully with penalty (not on time)', async () => {
-    //     jest
-    //       .spyOn(Member, 'findOne')
-    //       .mockReturnValueOnce(
-    //         Promise.resolve({ id: 1, code: 'M001', borrowing: 1 })
-    //       );
-    //     jest
-    //       .spyOn(Book, 'findOne')
-    //       .mockReturnValueOnce(
-    //         Promise.resolve({ id: 2, code: 'JK-45', stock: 0 })
-    //       );
-    //     jest.spyOn(BorrowedBook, 'findOne').mockReturnValueOnce(
-    //       Promise.resolve({
-    //         id: 3,
-    //         book_id: 2,
-    //         member_id: 1,
-    //         date_returned: new Date(Date.now() - 1000),
-    //       })
-    //     );
-
-    //     const response = await agent.post('/books/return').send({
-    //       member_code: 'M001',
-    //       book_code: 'JK-45',
-    //     });
-    //     expect(response.statusCode).toBe(200);
-    //     expect(response.body).toHaveProperty('message');
-    //     expect(response.body.message).toEqual(
-    //       'Book returned successfully with penalty'
-    //     );
-
-    //     jest.spyOn(Member, 'findOne').mockRestore();
-    //     jest.spyOn(Book, 'findOne').mockRestore();
-    //     jest.spyOn(BorrowedBook, 'findOne').mockRestore();
-    // });
+      jest.spyOn(Member, 'findOne').mockRestore();
+      jest.spyOn(Book, 'findOne').mockRestore();
+      jest.spyOn(BorrowedBook, 'findOne').mockRestore();
+    });
   });
 });
